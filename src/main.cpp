@@ -4,15 +4,18 @@ int main(int argc, char* argv[]){
     tree_t tree = {};
 
     TreeCtor(&tree);
+    AddTreeElem(&tree, 50);
+    int a = 12312837;
+
+    for (int i = 0; i < 50; i++){
+        AddTreeElem(&tree, a % 100);
+        TreeDump(&tree);
+
+        a = a << 1;
+        a += 23456789098;
+    }
+
+    HTMLDumpGenerate(&tree);
     TreePrint(&tree);
-
-    NewNode(&tree, 23, tree.root, LEFT, nullptr);
-    NewNode(&tree, 10, tree.root->left, LEFT, nullptr);
-    NewNode(&tree, 25, tree.root->left, RIGHT, nullptr);
-    NewNode(&tree, 26, tree.root->left->right, RIGHT, nullptr);
-    NewNode(&tree, 27, tree.root->left->right->right, RIGHT, nullptr);
-
-    TreeDump(&tree);
-
     return 0;
 }
