@@ -27,8 +27,9 @@ int NewNode(tree_t* tree, data_t data, node_t* parentNode, param_t param, node_t
     //tree verify?
     node_t* newNode = (node_t*)calloc(1, sizeof(*newNode));
 
-    newNode->data = data;
-    newNode->id   = tree->numElem;
+    newNode->data       = data;
+    newNode->id         = tree->numElem;
+    tree->lastModified  = tree->numElem;
 
     switch(param){
         case ROOT:{
@@ -60,6 +61,7 @@ int NewNode(tree_t* tree, data_t data, node_t* parentNode, param_t param, node_t
         }
     }
 
+
     tree->numElem++;
     return OK;
 }
@@ -80,6 +82,8 @@ int TreeCtor(tree_t* tree){
 
     HTMLGenerateHead(tree);
     //tree verify
+
+    fprintf(tree->files.log, "tree created\n");
     return OK;
 }
 
@@ -96,22 +100,25 @@ int TreeDtor(tree_t* tree){
 
 int TreePrint(tree_t* tree){
     //tree verify
-    NodePrint(tree->root);
+    fprintf(tree->files.log, "\ntree print:\n");
+
+    NodePrint(tree, tree->root);
     printf("\n");
 
+    fprintf(tree->files.log, "tree printed\n");
     return OK;
 }
 
-int NodePrint(node_t* node){
+int NodePrint(tree_t* tree, node_t* node){
     if (!node) return OK;
 
     printf("(");
 
-    if (node->left)    NodePrint(node->left);
+    if (node->left)    NodePrint(tree, node->left);
 
     printf("%lld", node->data);
 
-    if (node->right)   NodePrint(node->right);
+    if (node->right)   NodePrint(tree, node->right);
     printf(")");
 
     return OK;
@@ -120,6 +127,7 @@ int NodePrint(node_t* node){
 /*=================================================================*/
 
 int TreeDump(tree_t* tree){
+    fprintf(tree->files.log, "\ntree dump#%d started\n", tree->numDump + 1);
 
     StartTreeDump(tree);
     NodeDump(tree, tree->root);
@@ -128,15 +136,24 @@ int TreeDump(tree_t* tree){
     DoDot(tree);
     HTMLGenerateBody(tree);
 
+    fprintf(tree->files.log, "tree dumped\n");
     return OK;
 }
 
 static int NodeDump(tree_t* tree, node_t* node){
     if (!node) return OK;
 
-    fprintf(tree->files.dot,
-            "\tnode%0.3lu [fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#e6f2ff\";label = \" { %0.3lu } | { data = %3.0lld }\"];\n",
+    if (node->id == tree->lastModified){
+        fprintf(tree->files.dot,
+            "\tnode%0.3lu [fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#79FF61\";label = \" { %0.3lu } | { data = %3.0lld }\"];\n",
             node->id, node->id, node->data);
+    }
+
+    else{
+        fprintf(tree->files.dot,
+                "\tnode%0.3lu [fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#e6f2ff\";label = \" { %0.3lu } | { data = %3.0lld }\"];\n",
+                node->id, node->id, node->data);
+    }
 
     if (node->left){
         fprintf(tree->files.dot,

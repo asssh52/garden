@@ -37,6 +37,7 @@ typedef struct tree_t{
     size_t      numElem;
     size_t      numDump;
 
+    size_t      lastModified;
     files_t     files;
 
 } tree_t;
@@ -54,7 +55,7 @@ int TreeDtor        (tree_t* tree);
 int TreeCtor        (tree_t* tree);
 int TreePrint       (tree_t* tree);
 int TreeDump        (tree_t* tree);
-int NodePrint       (node_t* node);
+int NodePrint       (tree_t* tree, node_t* node);
 int StartTreeDump   (tree_t* tree);
 int EndTreeDump     (tree_t* tree);
 int AddTreeElem     (tree_t* tree, data_t data);
