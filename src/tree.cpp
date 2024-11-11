@@ -92,16 +92,11 @@ static int LoadNode(tree_t* tree, node_t* node, param_t param){
         fscanf(tree->files.save, "%[^{}]", buffer);
         bracket = getc(tree->files.save);
 
-        printf(CYN "root:<%s>\n" RESET, buffer);
-        printf(CYN "root:<%c>\n\n" RESET, bracket);
-
         if (bracket == '{'){
             NewNode(tree, newData, nullptr, ROOT, &tree->root);
         }
         else return 0;
         fscanf(tree->files.save, "\"%[^\"]\"", newData);
-
-        printf(CYN "root:<%s>\n" RESET, newData);
 
         fscanf(tree->files.save, "%[^{}]", buffer);
         bracket = getc(tree->files.save);
@@ -120,18 +115,11 @@ static int LoadNode(tree_t* tree, node_t* node, param_t param){
         fscanf(tree->files.save, "%[^{}]", buffer);
         bracket = getc(tree->files.save);
 
-        printf(CYN "left:<%s>\n" RESET, buffer);
-        printf(CYN "left:<%c>\n" RESET, bracket);
-
         if (bracket == '{'){
             NewNode(tree, newData, node, LEFT, &newNode);
         }
         else return 0;
         fscanf(tree->files.save, "\"%[^\"]\"", newData);
-
-
-        printf(CYN "left:<%s>\n" RESET, newData);
-
 
         fscanf(tree->files.save, "%[^{}]", buffer);
         bracket = getc(tree->files.save);
@@ -150,20 +138,11 @@ static int LoadNode(tree_t* tree, node_t* node, param_t param){
         fscanf(tree->files.save, "%[^{}]", buffer);
         bracket = getc(tree->files.save);
 
-
-        printf(CYN "right:<%s>\n" RESET, buffer);
-        printf(CYN "right:<%c>\n" RESET, bracket);
-
-
         if (bracket == '{'){
             NewNode(tree, newData, node, RIGHT, &newNode);
         }
         else return OK;
         fscanf(tree->files.save, "\"%[^\"]\"", newData);
-
-
-        printf(CYN "right:<%s>\n" RESET, newData);
-
 
         fscanf(tree->files.save, "%[^{}]", buffer);
         bracket = getc(tree->files.save);
