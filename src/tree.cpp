@@ -2,8 +2,8 @@
 #define MEOW fprintf(stderr, RED "MEOW\n" RESET);
 
 const int64_t POISON        = -52;
-const int64_t MESSAGE_LEN   = 100;
-const int64_t ANS_LEN       = 20;
+const int64_t MESSAGE_LEN   = 150;
+const int64_t ANS_LEN       = 50;
 
 enum errors{
 
@@ -13,8 +13,8 @@ enum errors{
 };
 
 static int NodeDump         (tree_t* tree, node_t* node, int depth, param_t param);
-static int NodeDel          (tree_t* tree, node_t* node);
 static int NodePrint        (tree_t* tree, node_t* node, int depth, FILE* file);
+static int NodeDel          (tree_t* tree, node_t* node);
 static int AddNodeElem      (tree_t* tree, node_t* node, data_t data);
 static int DoDot            (tree_t* tree);
 
@@ -22,7 +22,7 @@ static int HTMLGenerateHead (tree_t* tree);
 static int HTMLGenerateBody (tree_t* tree, param_t param);
 
 static int LoadTree         (tree_t* tree);
-static int LoadNode         (tree_t* tree, node_t* node);
+static int LoadNode         (tree_t* tree, node_t* node, param_t param);
 
 static int NewQuestion      (tree_t* tree, node_t* node);
 static int ProcessNode      (tree_t* tree, node_t* node);
@@ -31,20 +31,35 @@ static int StartTreeDump    (tree_t* tree);
 static int EndTreeDump      (tree_t* tree);
 static int AskQuestion      (node_t* node);
 static int AskContinue      (int* retValue);
+static int AskSave          (int* retValue);
+static int AskLoad          (int* retValue);
 static int GetAnswer        (int* retValue);
 
 /*=================================================================*/
 
 int StartAkinator(tree_t* tree){
-    LoadTree(tree);
+
+    int doLoad      = POISON;
+    int doSave      = POISON;
+    int doContinue  = POISON;
+
+    AskLoad(&doLoad);
+    if (doLoad)LoadTree(tree);
 
     ProcessNode(tree, tree->root);
 
-    int doContinue = POISON;
     AskContinue(&doContinue);
 
-    if (doContinue) StartAkinator(tree);
-    else SaveTree(tree);
+    while (doContinue){
+        doContinue  = POISON;
+
+        ProcessNode(tree, tree->root);
+        AskContinue(&doContinue);
+    }
+
+    AskSave(&doSave);
+    if (doSave) SaveTree(tree);
+
 
     return OK;
 }
@@ -60,19 +75,107 @@ static int LoadTree(tree_t* tree){
     //open save
     TreeDel(tree);
 
-    LoadNode(tree, tree->root);
+    LoadNode(tree, tree->root, ROOT);
 
 
     return OK;
 }
 
-static int LoadNode(tree_t* tree, node_t* node){
-    char* newData        = (char*)calloc(ANS_LEN, sizeof(char));
-    char* newQuestion    = (char*)calloc(ANS_LEN, sizeof(char));
-    fscanf("{%[]",);
+static int LoadNode(tree_t* tree, node_t* node, param_t param){
+    char* newData   = (char*)calloc(ANS_LEN, sizeof(*newData));
+    char* newData2  = (char*)calloc(ANS_LEN, sizeof(*newData));
+    node_t* newNode = nullptr;
+    char buffer[MESSAGE_LEN] = {};
+    char bracket = 0;
+
+    if (param == ROOT){
+        fscanf(tree->files.save, "%[^{}]", buffer);
+        bracket = getc(tree->files.save);
+
+        printf(CYN "root:<%s>\n" RESET, buffer);
+        printf(CYN "root:<%c>\n\n" RESET, bracket);
+
+        if (bracket == '{'){
+            NewNode(tree, newData, nullptr, ROOT, &tree->root);
+        }
+        else return 0;
+        fscanf(tree->files.save, "\"%[^\"]\"", newData);
+
+        printf(CYN "root:<%s>\n" RESET, newData);
+
+        fscanf(tree->files.save, "%[^{}]", buffer);
+        bracket = getc(tree->files.save);
+
+        if (bracket == '{'){
+            ungetc(bracket, tree->files.save);
+            LoadNode(tree, tree->root, LEFT);
+        }
 
 
-    return OK;
+        LoadNode(tree, tree->root, RIGHT);
+        return OK;
+    }
+
+    else if (param == LEFT){
+        fscanf(tree->files.save, "%[^{}]", buffer);
+        bracket = getc(tree->files.save);
+
+        printf(CYN "left:<%s>\n" RESET, buffer);
+        printf(CYN "left:<%c>\n" RESET, bracket);
+
+        if (bracket == '{'){
+            NewNode(tree, newData, node, LEFT, &newNode);
+        }
+        else return 0;
+        fscanf(tree->files.save, "\"%[^\"]\"", newData);
+
+
+        printf(CYN "left:<%s>\n" RESET, newData);
+
+
+        fscanf(tree->files.save, "%[^{}]", buffer);
+        bracket = getc(tree->files.save);
+
+        if (bracket == '{'){
+            ungetc(bracket, tree->files.save);
+            LoadNode(tree, newNode, LEFT);
+        }
+
+        LoadNode(tree, node, RIGHT);
+
+        return OK;
+    }
+
+    else if (param == RIGHT){
+        fscanf(tree->files.save, "%[^{}]", buffer);
+        bracket = getc(tree->files.save);
+
+
+        printf(CYN "right:<%s>\n" RESET, buffer);
+        printf(CYN "right:<%c>\n" RESET, bracket);
+
+
+        if (bracket == '{'){
+            NewNode(tree, newData, node, RIGHT, &newNode);
+        }
+        else return OK;
+        fscanf(tree->files.save, "\"%[^\"]\"", newData);
+
+
+        printf(CYN "right:<%s>\n" RESET, newData);
+
+
+        fscanf(tree->files.save, "%[^{}]", buffer);
+        bracket = getc(tree->files.save);
+
+        if (bracket == '{'){
+            ungetc(bracket, tree->files.save);
+            LoadNode(tree, newNode, LEFT);
+        }
+
+        LoadNode(tree, newNode, RIGHT);
+        return OK;
+    }
 }
 
 static int SaveTree(tree_t* tree){
@@ -139,9 +242,23 @@ static int NewQuestion(tree_t* tree, node_t* node){
     return OK;
 }
 
-static int AskContinue(int* doContinue){
+static int AskContinue(int* retValue){
     printf("продолжить?\n");
-    GetAnswer(doContinue);
+    GetAnswer(retValue);
+
+    return OK;
+}
+
+static int AskLoad(int* retValue){
+    printf("загрузить?\n");
+    GetAnswer(retValue);
+
+    return OK;
+}
+
+static int AskSave(int* retValue){
+    printf("сохранить?\n");
+    GetAnswer(retValue);
 
     return OK;
 }
@@ -230,6 +347,8 @@ int TreeCtor(tree_t* tree){
         tree->files.htmlName = "htmldump.html";
     }
 
+    NewNode(tree, "никто", nullptr, ROOT, &tree->root);
+
     HTMLGenerateHead(tree);
     //tree verify
 
@@ -250,8 +369,6 @@ int TreeDel(tree_t* tree){
     NodeDel(tree, tree->root);
     tree->numElem = 0;
 
-    NewNode(tree, "никто", nullptr, ROOT, &tree->root);
-
     return OK;
 }
 
@@ -270,6 +387,7 @@ int TreePrint(tree_t* tree, FILE* file){
     //tree verify
     fprintf(tree->files.log, "\ntree print:\n");
 
+    fprintf(file, "\n");
     NodePrint(tree, tree->root, 0, file);
     printf("\n");
 
