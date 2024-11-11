@@ -2,9 +2,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "colors.hpp"
 
-typedef int64_t data_t;
+typedef char* data_t;
 
 typedef struct node_t{
 
@@ -22,6 +23,9 @@ typedef struct files_t{
     char*   logName;
     FILE*   log;
 
+    char*   saveName;
+    FILE*   save;
+
     char*   dotName;
     FILE*   dot;
 
@@ -38,26 +42,30 @@ typedef struct tree_t{
     size_t      numDump;
 
     size_t      lastModified;
+    size_t      currentNode;
     files_t     files;
 
 } tree_t;
 
 typedef enum params{
 
-    ROOT    =   0,
-    LEFT    =   1,
-    RIGHT   =   2
+    ROOT        =   0,
+    LEFT        =   1,
+    RIGHT       =   2,
+
+    DETAILED    =   3,
+    SIMPLE      =   4
 
 } param_t;
 
 int NewNode         (tree_t* tree, data_t data, node_t* parentNode, param_t param, node_t** returnNode);
 int TreeDtor        (tree_t* tree);
 int TreeCtor        (tree_t* tree);
-int TreePrint       (tree_t* tree);
+int TreePrint       (tree_t* tree, FILE* file);
 int TreeDump        (tree_t* tree);
-int NodePrint       (tree_t* tree, node_t* node);
-int StartTreeDump   (tree_t* tree);
-int EndTreeDump     (tree_t* tree);
+int TreeDel         (tree_t* tree);
 int AddTreeElem     (tree_t* tree, data_t data);
+
+int StartAkinator   (tree_t* tree);
 
 int HTMLDumpGenerate(tree_t* tree);

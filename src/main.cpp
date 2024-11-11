@@ -4,18 +4,20 @@ int main(int argc, char* argv[]){
     tree_t tree = {};
 
     TreeCtor(&tree);
-    AddTreeElem(&tree, 50);
-    int a = 12312837;
+    AddTreeElem(&tree, "животное");
+    TreeDump(&tree);
+    NewNode(&tree, "полторашка", tree.root, LEFT, nullptr);
+    TreeDump(&tree);
+    NewNode(&tree, "препод", tree.root, RIGHT, nullptr);
+    TreeDump(&tree);
+    NewNode(&tree, "дед", tree.root->right, LEFT, nullptr);
+    TreeDump(&tree);
+    NewNode(&tree, "хз", tree.root->right, RIGHT, nullptr);
+    TreeDump(&tree);
 
-    for (int i = 0; i < 50; i++){
-        AddTreeElem(&tree, a % 100);
-        TreeDump(&tree);
-
-        a = a << 1;
-        a += 23456789098;
-    }
+    StartAkinator(&tree);
+    TreeDump(&tree);
 
     HTMLDumpGenerate(&tree);
-    TreePrint(&tree);
     return 0;
 }
