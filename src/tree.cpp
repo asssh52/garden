@@ -2,8 +2,9 @@
 #define MEOW fprintf(stderr, RED "MEOW\n" RESET);
 
 const int64_t POISON        = -52;
-const int64_t MESSAGE_LEN   = 150;
+const int64_t MESSAGE_LEN   = 300;
 const int64_t ANS_LEN       = 50;
+const int64_t BUFPTR_LEN    = 20;
 
 enum errors{
 
@@ -24,12 +25,17 @@ static int HTMLGenerateBody (tree_t* tree, param_t param);
 static int LoadTree         (tree_t* tree);
 static int LoadNode         (tree_t* tree, node_t* node, param_t param);
 
+static int NodeFind         (tree_t* tree, node_t* node, char* inputValue, node_t** retNode);
+static int TreeFind         (tree_t* tree, char* inputValue, node_t** retNode);
+
 static int NewQuestion      (tree_t* tree, node_t* node);
 static int ProcessNode      (tree_t* tree, node_t* node);
 static int SaveTree         (tree_t* tree);
 static int StartTreeDump    (tree_t* tree);
 static int EndTreeDump      (tree_t* tree);
 static int AskQuestion      (node_t* node);
+static int DefineElem       (tree_t* tree);
+static int AskDefine        (int* retValue);
 static int AskContinue      (int* retValue);
 static int AskSave          (int* retValue);
 static int AskLoad          (int* retValue);
@@ -42,11 +48,13 @@ int StartAkinator(tree_t* tree){
     int doLoad      = POISON;
     int doSave      = POISON;
     int doContinue  = POISON;
+    int doDefine    = POISON;
 
     AskLoad(&doLoad);
     if (doLoad)LoadTree(tree);
 
-    ProcessNode(tree, tree->root);
+    AskDefine(&doDefine);
+    if (doDefine)DefineElem(tree);
 
     AskContinue(&doContinue);
 
@@ -186,7 +194,7 @@ static int ProcessNode(tree_t* tree, node_t* node){
         }
 
         else{
-            printf("ура!!!\n");
+            printf(MAG "ура!!!\n" RESET);
         }
     }
 
@@ -203,14 +211,84 @@ static int ProcessNode(tree_t* tree, node_t* node){
     return OK;
 }
 
+static int DefineElem(tree_t* tree){
+    char inputValue[ANS_LEN] = {};
+    node_t* retNode = nullptr;
+
+    printf(GRN "введите вашу штуку\n" RESET);
+    scanf("\n%[^\n]", inputValue);
+    TreeFind(tree, inputValue, &retNode);
+
+    while (!retNode){
+        printf(RED "не могу найти, повторите запрос\n" RESET);
+        scanf("\n%[^\n]", inputValue);
+        TreeFind(tree, inputValue, &retNode);
+    }
+
+    //root path
+    node_t* currentNode = retNode;
+    char*   charPath[BUFPTR_LEN] = {};
+    int      intPath[BUFPTR_LEN] = {};
+
+    int counter = 0;
+    while (currentNode != tree->root){
+        if (currentNode == currentNode->parent->left)  intPath[counter] = 1;
+        else if (currentNode == currentNode->parent->right) intPath[counter] = -1;
+
+        currentNode = currentNode->parent;
+        charPath[counter] = currentNode->data;
+
+        counter++;
+    }
+    //root path
+
+    //out
+    char outMessage[MESSAGE_LEN] = {};
+    for (int i = counter - 1; i >= 0; i--){
+        if (i == counter - 1) snprintf(outMessage, MESSAGE_LEN, "это");
+
+        if (intPath[i] == 1){
+            snprintf(outMessage, MESSAGE_LEN, "%s %s", outMessage, charPath[i]);
+        }
+
+        else{
+            snprintf(outMessage, MESSAGE_LEN, "%s не %s", outMessage, charPath[i]);
+        }
+
+        if (i != 0) snprintf(outMessage, MESSAGE_LEN, "%s,", outMessage);
+    }
+
+    printf(CYN "%s\n" RESET, outMessage);
+    //out
+
+    return 0;
+}
+
+static int TreeFind(tree_t* tree, char* inputValue, node_t** retNode){
+    NodeFind(tree, tree->root, inputValue, retNode);
+
+    return OK;
+}
+
+static int NodeFind(tree_t* tree, node_t* node, char* inputValue, node_t** retNode){
+    if (!strcmp(node->data, inputValue)){
+        *retNode = node;
+        return OK;
+    }
+    if(node->left)  NodeFind(tree, node->left,  inputValue, retNode);
+    if(node->right) NodeFind(tree, node->right, inputValue, retNode);
+
+    return OK;
+}
+
 static int NewQuestion(tree_t* tree, node_t* node){
     char* newData        = (char*)calloc(ANS_LEN, sizeof(char));
     char* newQuestion    = (char*)calloc(ANS_LEN, sizeof(char));
 
-    printf("кто это был?\n");
+    printf(GRN "кто это был?\n" RESET);
     scanf("\n%[^\n]", newData);
 
-    printf("чем отличается %s от %s?\n", newData, node->data);
+    printf(GRN "чем отличается " CYN "%s" GRN " от " CYN "%s" GRN "?\n" RESET, newData, node->data);
     scanf("\n%[^\n]", newQuestion);
 
     NewNode(tree, node->data, node, RIGHT, nullptr);
@@ -222,25 +300,33 @@ static int NewQuestion(tree_t* tree, node_t* node){
 }
 
 static int AskContinue(int* retValue){
-    printf("продолжить?\n");
+    printf(GRN "продолжить?\n" RESET);
     GetAnswer(retValue);
 
     return OK;
 }
 
 static int AskLoad(int* retValue){
-    printf("загрузить?\n");
+    printf(GRN "загрузить?\n" RESET);
     GetAnswer(retValue);
 
     return OK;
 }
 
 static int AskSave(int* retValue){
-    printf("сохранить?\n");
+    printf(GRN "сохранить?\n" RESET);
     GetAnswer(retValue);
 
     return OK;
 }
+
+static int AskDefine(int* retValue){
+    printf(GRN "определить?\n" RESET);
+    GetAnswer(retValue);
+
+    return OK;
+}
+
 
 static int AskQuestion(node_t* node){
     char message[MESSAGE_LEN]= {};
@@ -259,7 +345,7 @@ static int GetAnswer(int* retValue){
         if      (!strcmp(buffer, "да"))     *retValue = 1;
         else if (!strcmp(buffer, "нет"))    *retValue = 0;
         else{
-            printf("неверный ввод, введите \"да\" или \"нет\"\n");
+            printf(RED "неверный ввод, введите \"да\" или \"нет\"\n" RESET);
         }
     }
 
@@ -426,19 +512,19 @@ static int NodeDump(tree_t* tree, node_t* node, int depth, param_t param){
     if (param == DETAILED){
         if (node->id == tree->currentNode){
             fprintf(tree->files.dot,
-                "\tnode%0.3lu [rankdir=LR; fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#FCFF61\";label = \" { %0.3lu } | { data = %s } | { pointer = %p} | { parent = %p} | { left = %p} | { right = %p}\"];\n",
+                "\tnode%0.3lu [rankdir=LR; fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#FCFF61\";label = \"{{ %0.3lu } | { data = %s } | { pointer = %p} | { parent = %p} | { left = %p} | { right = %p}}\"];\n",
                 node->id, node->id, node->data, node, node->parent, node->left, node->right);
         }
 
         else if (node->id == tree->lastModified){
             fprintf(tree->files.dot,
-                "\tnode%0.3lu [rankdir=LR; fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#79FF61\";label = \" { %0.3lu } | { data = %s } | { pointer = %p} | { parent = %p} | { left = %p} | { right = %p}\"];\n",
+                "\tnode%0.3lu [rankdir=LR; fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#79FF61\";label = \"{{ %0.3lu } | { data = %s } | { pointer = %p} | { parent = %p} | { left = %p} | { right = %p}}\"];\n",
                 node->id, node->id, node->data, node, node->parent, node->left, node->right);
         }
 
         else{
             fprintf(tree->files.dot,
-                    "\tnode%0.3lu [rankdir=LR; fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#e6f2ff\";label = \" { %0.3lu } | { data = %s } | { pointer = %p} | { parent = %p} | { left = %p} | { right = %p}\"];\n",
+                    "\tnode%0.3lu [rankdir=LR; fontname=\"SF Pro\"; shape=Mrecord; style=filled; color=\"#e6f2ff\";label = \"{{ %0.3lu } | { data = %s } | { pointer = %p} | { parent = %p} | { left = %p} | { right = %p}}\"];\n",
                     node->id, node->id, node->data, node, node->parent, node->left, node->right);
         }
     }
