@@ -61,7 +61,6 @@ typedef enum params{
 int NewNode         (tree_t* tree, data_t data, node_t* parentNode, param_t param, node_t** returnNode);
 int TreeDtor        (tree_t* tree);
 int TreeCtor        (tree_t* tree);
-int TreePrint       (tree_t* tree, FILE* file);
 int TreeDump        (tree_t* tree);
 int TreeDel         (tree_t* tree);
 int AddTreeElem     (tree_t* tree, data_t data);

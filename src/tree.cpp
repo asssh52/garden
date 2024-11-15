@@ -2,9 +2,11 @@
 #define MEOW fprintf(stderr, RED "MEOW\n" RESET);
 
 const int64_t POISON        = -52;
-const int64_t MESSAGE_LEN   = 500;
-const int64_t ANS_LEN       = 50;
-const int64_t BUFPTR_LEN    = 20;
+
+const int64_t COMMAND_LEN   = 200; //max system command length
+const int64_t MESSAGE_LEN   = 500; //max output message length
+const int64_t ANS_LEN       = 50;  //max user input length
+const int64_t BUFPTR_LEN    = 20;  //max message depth in 'define' and 'compare'
 
 enum errors{
 
@@ -21,18 +23,28 @@ enum commands{
     LOAD        = 4,
     SAVE        = 5,
     HELP        = 6,
+    GITSAVE     = 7,
+    GITLOAD     = 8,
+    TREE_RESET  = 9,
     HLT         = 0
 
 };
 
+// MISCELANEOUS
+static int TreeVerify       (tree_t* tree);
+static int NodeVerify       (tree_t* tree, node_t* node, int depth);
 static int NodeDel          (tree_t* tree, node_t* node);
 static int AddNodeElem      (tree_t* tree, node_t* node, data_t data);
 static int NodeFind         (tree_t* tree, node_t* node, char* inputValue, node_t** retNode);
+// MISCELANEOUS
 
 // SAVE/LOAD
 static int LoadTree         (tree_t* tree);
 static int LoadNode         (tree_t* tree, node_t* node, param_t param);
 static int SaveTree         (tree_t* tree);
+static int TreePrint        (tree_t* tree, FILE* file);
+static int GitSave          (tree_t* tree);
+static int GitLoad          (tree_t* tree);
 // SAVE/LOAD
 
 //USER RELATED
@@ -60,8 +72,10 @@ static int NodePrint        (tree_t* tree, node_t* node, int depth, FILE* file);
 
 
 /*=================================================================*/
+//starting programm
 
 int StartAkinator(tree_t* tree){
+
     int command = POISON;
 
     AskCommand(&command);
@@ -92,6 +106,18 @@ int StartAkinator(tree_t* tree){
                 GetHelp();
                 break;
 
+            case GITSAVE:
+                GitSave(tree);
+                break;
+
+            case GITLOAD:
+                GitLoad(tree);
+                break;
+
+            case TREE_RESET:
+                TreeDel(tree);
+                break;
+
             case HLT:
                 break;
 
@@ -114,12 +140,16 @@ static int GetHelp(){
     printf(CYN "- \"загрузить\" \n");
     printf(CYN "- \"сохранить\" \n");
     printf(CYN "- \"помощь\" \n");
+    printf(CYN "- \"гит загрузить\" \n");
+    printf(CYN "- \"гит сохранить\" \n");
+    printf(CYN "- \"сбросить\" \n");
     printf(CYN "- \"закончить\" \n" RESET);
 
     return OK;
 }
 
 /*=================================================================*/
+//loading tree from file
 
 static int LoadTree(tree_t* tree){
 
@@ -139,6 +169,7 @@ static int LoadTree(tree_t* tree){
 }
 
 /*=================================================================*/
+//loading node from file
 
 static int LoadNode(tree_t* tree, node_t* node, param_t param){
     char* newData   = (char*)calloc(ANS_LEN, sizeof(*newData));
@@ -217,8 +248,10 @@ static int LoadNode(tree_t* tree, node_t* node, param_t param){
 }
 
 /*=================================================================*/
+//saving tree to file
 
 static int SaveTree(tree_t* tree){
+    if (TreeVerify(tree)) return ERR;
 
     tree->files.save = fopen(tree->files.saveName, "w");
     if (!tree->files.save){
@@ -234,6 +267,7 @@ static int SaveTree(tree_t* tree){
 }
 
 /*=================================================================*/
+//getting user answer to node question
 
 static int ProcessNode(tree_t* tree, node_t* node){
     int retValue = POISON;
@@ -259,8 +293,11 @@ static int ProcessNode(tree_t* tree, node_t* node){
 }
 
 /*=================================================================*/
+// defining elem
 
 static int DefineElem(tree_t* tree){
+    if (TreeVerify(tree)) return ERR;
+
     char inputValue[ANS_LEN] = {};
     node_t* retNode = nullptr;
 
@@ -314,6 +351,7 @@ static int DefineElem(tree_t* tree){
 }
 
 /*=================================================================*/
+//comparing two elems
 
 static int CompareElems(tree_t* tree){
     char inputValueFirst[ANS_LEN] = {};
@@ -385,27 +423,24 @@ static int CompareElems(tree_t* tree){
     snprintf(outMessage, MESSAGE_LEN, "%s похож на %s тем что, они:\n", inputValueFirst, inputValueSecond);
 
     for (int ctr1 = counterFirst - 1, ctr2 = counterSecond - 1; ctr1 >= 0 || ctr2 >= 0; ctr1--, ctr2--){
-        if (ctr1 >= 0 && ctr2 >= 0){
-            if (charPathFirst[ctr1] == charPathSecond[ctr2]){
-                if (intPathFirst[ctr1] == intPathSecond[ctr2] && intPathSecond[ctr2] == 1){
-                    snprintf(outMessage, MESSAGE_LEN, "%s %s", outMessage, charPathFirst[ctr1]);
-                }
-
-                else if (intPathFirst[ctr1] == intPathSecond[ctr2] && intPathSecond[ctr2] == -1){
-                    snprintf(outMessage, MESSAGE_LEN, "%s не %s", outMessage, charPathFirst[ctr1]);
-                }
-
-                else if (intPathFirst[ctr1] == -1 && intPathSecond[ctr2] == 1){
-                    snprintf(outMessage, MESSAGE_LEN, "%s отличаются тем, что %s не %s", outMessage, inputValueFirst, charPathFirst[ctr1]);
-                }
-
-                else{
-                    snprintf(outMessage, MESSAGE_LEN, "%s отличаются тем, что %s не %s", outMessage, inputValueSecond, charPathFirst[ctr1]);
-                }
-
-                if(intPathFirst[ctr1] == intPathSecond[ctr2]) snprintf(outMessage, MESSAGE_LEN, "%s,", outMessage);
+        if (ctr1 >= 0 && ctr2 >= 0 && charPathFirst[ctr1] == charPathSecond[ctr2]){
+            if (intPathFirst[ctr1] == intPathSecond[ctr2] && intPathSecond[ctr2] == 1){
+                snprintf(outMessage, MESSAGE_LEN, "%s %s", outMessage, charPathFirst[ctr1]);
             }
 
+            else if (intPathFirst[ctr1] == intPathSecond[ctr2] && intPathSecond[ctr2] == -1){
+                snprintf(outMessage, MESSAGE_LEN, "%s не %s", outMessage, charPathFirst[ctr1]);
+            }
+
+            else if (intPathFirst[ctr1] == -1 && intPathSecond[ctr2] == 1){
+                snprintf(outMessage, MESSAGE_LEN, "%s отличаются тем, что %s не %s", outMessage, inputValueFirst, charPathFirst[ctr1]);
+            }
+
+            else{
+                snprintf(outMessage, MESSAGE_LEN, "%s отличаются тем, что %s не %s", outMessage, inputValueSecond, charPathFirst[ctr1]);
+            }
+
+            if(intPathFirst[ctr1] == intPathSecond[ctr2]) snprintf(outMessage, MESSAGE_LEN, "%s,", outMessage);
         }
     }
 
@@ -415,6 +450,7 @@ static int CompareElems(tree_t* tree){
 }
 
 /*=================================================================*/
+// finding elem in tree
 
 static int TreeFind(tree_t* tree, char* inputValue, node_t** retNode){
     NodeFind(tree, tree->root, inputValue, retNode);
@@ -434,6 +470,7 @@ static int NodeFind(tree_t* tree, node_t* node, char* inputValue, node_t** retNo
 }
 
 /*=================================================================*/
+// creating new question
 
 static int NewQuestion(tree_t* tree, node_t* node){
     char* newData        = (char*)calloc(ANS_LEN, sizeof(char));
@@ -454,20 +491,24 @@ static int NewQuestion(tree_t* tree, node_t* node){
 }
 
 /*=================================================================*/
+//user input/answers
 
 static int AskCommand(int* retValue){
     char buffer[ANS_LEN] = {};
 
     while (*retValue == POISON){
-        scanf("%s", buffer);
+        scanf("\n%[^\n]", buffer);
 
-        if      (!strcmp(buffer, "акинатор"))   *retValue = AKINATOR;
-        else if (!strcmp(buffer, "определить")) *retValue = DEFINE;
-        else if (!strcmp(buffer, "сравнить"))   *retValue = COMPARE;
-        else if (!strcmp(buffer, "загрузить"))  *retValue = LOAD;
-        else if (!strcmp(buffer, "сохранить"))  *retValue = SAVE;
-        else if (!strcmp(buffer, "помощь"))     *retValue = HELP;
-        else if (!strcmp(buffer, "закончить"))  *retValue = HLT;
+        if      (!strcmp(buffer, "акинатор"))       *retValue = AKINATOR;
+        else if (!strcmp(buffer, "определить"))     *retValue = DEFINE;
+        else if (!strcmp(buffer, "сравнить"))       *retValue = COMPARE;
+        else if (!strcmp(buffer, "загрузить"))      *retValue = LOAD;
+        else if (!strcmp(buffer, "сохранить"))      *retValue = SAVE;
+        else if (!strcmp(buffer, "помощь"))         *retValue = HELP;
+        else if (!strcmp(buffer, "гит сохранить"))  *retValue = GITSAVE;
+        else if (!strcmp(buffer, "гит загрузить"))  *retValue = GITLOAD;
+        else if (!strcmp(buffer, "сбросить"))       *retValue = TREE_RESET;
+        else if (!strcmp(buffer, "закончить"))      *retValue = HLT;
         else{
             printf(RED "неверный ввод, доступные команды: " CYN "\"помощь\"\n" RESET);
         }
@@ -478,7 +519,7 @@ static int AskCommand(int* retValue){
 
 static int AskQuestion(node_t* node){
     char message[MESSAGE_LEN]= {};
-    snprintf(message, MESSAGE_LEN, "это %s?\n", node->data);
+    snprintf(message, MESSAGE_LEN, GRN "это " BLU "%s" GRN "?\n" RESET, node->data);
 
     printf("%s", message);
     return OK;
@@ -501,9 +542,9 @@ static int GetAnswer(int* retValue){
 }
 
 /*=================================================================*/
+//creating new node
 
 int NewNode(tree_t* tree, data_t data, node_t* parentNode, param_t param, node_t** returnNode){
-    //tree verify?
     node_t* newNode = (node_t*)calloc(1, sizeof(*newNode));
     if (newNode == nullptr) abort();
 
@@ -547,6 +588,7 @@ int NewNode(tree_t* tree, data_t data, node_t* parentNode, param_t param, node_t
 }
 
 /*=================================================================*/
+// creating tree struct
 
 int TreeCtor(tree_t* tree){
     if (!tree) return ERR;
@@ -563,22 +605,30 @@ int TreeCtor(tree_t* tree){
     NewNode(tree, "никто", nullptr, ROOT, &tree->root);
 
     HTMLGenerateHead(tree);
-    //tree verify
 
+    if (TreeVerify(tree)) return ERR;
     fprintf(tree->files.log, "tree created\n");
+
     return OK;
 }
 
 /*=================================================================*/
+//deleting tree/nodes
 
 int TreeDtor(tree_t* tree){
-    //tree verify
+    if (TreeVerify(tree)) return ERR;
 
+    TreeDel(tree);
+    if(tree->files.dot) fclose(tree->files.dot);
+    if(tree->files.log && tree->files.log != stdout) fclose(tree->files.log);
+    if(tree->files.html) fclose(tree->files.html);
 
     return OK;
 }
 
 int TreeDel(tree_t* tree){
+    if (TreeVerify(tree)) return ERR;
+
     NodeDel(tree, tree->root);
     tree->numElem = 0;
 
@@ -594,10 +644,31 @@ static int NodeDel(tree_t* tree, node_t* node){
 
     return OK;
 }
-/*=================================================================*/
 
-int TreePrint(tree_t* tree, FILE* file){
-    //tree verify
+/*=================================================================*/
+// verifycator for loops
+
+static int TreeVerify(tree_t* tree){
+    if (NodeVerify(tree, tree->root, 0)) return ERR;
+
+    return OK;
+}
+
+static int NodeVerify(tree_t* tree, node_t* node, int depth){
+    if (depth > tree->numElem) return ERR;
+
+    if (node->left)     NodeVerify(tree, node->left, depth + 1);
+    if (node->right)    NodeVerify(tree, node->right, depth + 1);
+
+    return OK;
+}
+
+/*=================================================================*/
+// output tree to file
+
+static int TreePrint(tree_t* tree, FILE* file){
+    if (TreeVerify(tree)) return ERR;
+
     fprintf(tree->files.log, "\ntree print:\n");
 
     fprintf(file, "\n");
@@ -637,6 +708,7 @@ static int NodePrint(tree_t* tree, node_t* node, int depth, FILE* file){
 }
 
 /*=================================================================*/
+// dump
 
 int TreeDump(tree_t* tree){
     fprintf(tree->files.log, "\ntree dump#%lu started\n", tree->numDump + 1);
@@ -720,6 +792,7 @@ static int NodeDump(tree_t* tree, node_t* node, int depth, param_t param){
 }
 
 /*=================================================================*/
+// part of tree dump
 
 static int StartTreeDump(tree_t* tree){
 
@@ -747,9 +820,11 @@ static int EndTreeDump(tree_t* tree){
 }
 
 /*=================================================================*/
+// adding elements
 
 int AddTreeElem(tree_t* tree, data_t data){
-    //verify
+    if (TreeVerify(tree)) return ERR;
+
     node_t* currentNode = tree->root;
 
     if (!currentNode){
@@ -769,18 +844,15 @@ int AddNodeElem(tree_t* tree, node_t* node, data_t data){
     if (data < node->data){
         if (node->left){
             AddNodeElem(tree, node->left,  data);
-
             return OK;
         }
 
         NewNode(tree, data, node, LEFT, nullptr);
-
     }
 
     else{
         if (node->right){
             AddNodeElem(tree, node->right, data);
-
             return OK;
         }
 
@@ -791,6 +863,50 @@ int AddNodeElem(tree_t* tree, node_t* node, data_t data){
 }
 
 /*=================================================================*/
+// working with git
+
+static int GitSave(tree_t* tree){
+    if (TreeVerify(tree)) return ERR;
+
+    char systemCommand[COMMAND_LEN] = {};
+
+    tree->files.save = fopen("../database/akinator_db/save.txt", "w");
+    TreePrint(tree, tree->files.save);
+    fclose(tree->files.save);
+
+    //uploading
+    snprintf(systemCommand, COMMAND_LEN, "cd ../database/akinator_db && git add save.txt && git commit -C main && git push");
+    printf(MAG "%s\n" RESET, systemCommand);
+    system(systemCommand);
+
+    return OK;
+}
+
+
+static int GitLoad(tree_t* tree){
+    TreeVerify(tree);
+
+    char systemCommand[COMMAND_LEN] = {};
+
+    //remove old dirs
+    snprintf(systemCommand, COMMAND_LEN, "cd ../database && rm -rf akinator_db");
+    printf(MAG "%s\n" RESET, systemCommand);
+    system(systemCommand);
+
+    //load from git
+    snprintf(systemCommand, COMMAND_LEN, "cd ../database && git clone https://github.com/asssh52/akinator_db");
+    printf(MAG "%s\n" RESET, systemCommand);
+    system(systemCommand);
+
+    char saveName[COMMAND_LEN] = "../database/akinator_db/save.txt";
+    tree->files.saveName = saveName;
+
+    LoadTree(tree);
+
+    return OK;
+}
+/*=================================================================*/
+//generating html/png
 
 static int DoDot(tree_t* tree){
     char command[100]   = {};
