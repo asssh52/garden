@@ -5,10 +5,10 @@ int main(int argc, char* argv[]){
 
     TreeCtor(&tree);
 
-
     StartAkinator(&tree);
-    TreeDump(&tree);
 
     HTMLDumpGenerate(&tree);
+
+    TreeDtor(&tree);
     return 0;
 }

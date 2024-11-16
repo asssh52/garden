@@ -162,9 +162,10 @@ static int LoadTree(tree_t* tree){
     //open save
     TreeDel(tree);
 
+    tree->numElem = 0;
     LoadNode(tree, tree->root, ROOT);
 
-
+    TreeDump(tree);
     return OK;
 }
 
@@ -619,6 +620,8 @@ int TreeDtor(tree_t* tree){
     if (TreeVerify(tree)) return ERR;
 
     TreeDel(tree);
+    NodeDel(tree, tree->root);
+
     if(tree->files.dot) fclose(tree->files.dot);
     if(tree->files.log && tree->files.log != stdout) fclose(tree->files.log);
     if(tree->files.html) fclose(tree->files.html);
@@ -630,7 +633,8 @@ int TreeDel(tree_t* tree){
     if (TreeVerify(tree)) return ERR;
 
     NodeDel(tree, tree->root);
-    tree->numElem = 0;
+
+    NewNode(tree, "никто", nullptr, ROOT, &tree->root);
 
     return OK;
 }
@@ -638,7 +642,11 @@ int TreeDel(tree_t* tree){
 static int NodeDel(tree_t* tree, node_t* node){
 
     if (node->left)  NodeDel(tree, node->left);
+
     if (node->right) NodeDel(tree, node->right);
+
+    free(node);
+    tree->numElem--;
 
     TreeDump(tree);
 
@@ -711,7 +719,7 @@ static int NodePrint(tree_t* tree, node_t* node, int depth, FILE* file){
 // dump
 
 int TreeDump(tree_t* tree){
-    fprintf(tree->files.log, "\ntree dump#%lu started\n", tree->numDump + 1);
+    //fprintf(tree->files.log, "\ntree dump#%lu started\n", tree->numDump + 1);
 
     StartTreeDump(tree);
     NodeDump(tree, tree->root, 0, SIMPLE);
@@ -720,7 +728,7 @@ int TreeDump(tree_t* tree){
     DoDot(tree);
     HTMLGenerateBody(tree, SIMPLE);
 
-    fprintf(tree->files.log, "tree dumped\n");
+    //fprintf(tree->files.log, "tree dumped\n");
     return OK;
 }
 
@@ -876,7 +884,6 @@ static int GitSave(tree_t* tree){
 
     //uploading
     snprintf(systemCommand, COMMAND_LEN, "cd ../database/akinator_db && git add save.txt && git commit -C main && git push");
-    printf(MAG "%s\n" RESET, systemCommand);
     system(systemCommand);
 
     return OK;
@@ -890,12 +897,10 @@ static int GitLoad(tree_t* tree){
 
     //remove old dirs
     snprintf(systemCommand, COMMAND_LEN, "cd ../database && rm -rf akinator_db");
-    printf(MAG "%s\n" RESET, systemCommand);
     system(systemCommand);
 
     //load from git
     snprintf(systemCommand, COMMAND_LEN, "cd ../database && git clone https://github.com/asssh52/akinator_db");
-    printf(MAG "%s\n" RESET, systemCommand);
     system(systemCommand);
 
     char saveName[COMMAND_LEN] = "../database/akinator_db/save.txt";
